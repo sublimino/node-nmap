@@ -76,11 +76,17 @@ function convertRawJsonToScanResults(xmlInput) {
         let tunnel
         let method
         let product
+        let scriptOutput
+
         if (portItem.service && portItem.service[0]) {
           service = portItem.service[0].$.name
           tunnel = portItem.service[0].$.tunnel
           method = portItem.service[0].$.method
           product = portItem.service[0].$.tunnel
+        }
+
+        if (portItem.script && portItem.script[0]) {
+          scriptOutput = portItem.script[0].$.output
         }
 
         let portObject = {}
@@ -91,6 +97,8 @@ function convertRawJsonToScanResults(xmlInput) {
         if (tunnel) portObject.tunnel = tunnel || ''
         if (method) portObject.method = method || ''
         if (product) portObject.product = product || ''
+
+        if (scriptOutput) portObject.scriptOutput = scriptOutput || ''
 
         return portObject
       })
