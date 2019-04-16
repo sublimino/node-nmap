@@ -14,11 +14,19 @@ const os = require('os');
 const Queue = require('queued-up');
 const xml2js = require('xml2js');
 
+const debug = (process.env.DEBUG === '0' ? false : (!!process.env.DEBUG ? true : !!process.env.REMOTE_DEBUG))
+
+function log () {
+  if (debug) {
+    // process.stdout.write('# ')
+    console.log.apply(null, arguments)
+  }
+}
 
 /**
- * 
- * @param {*} xmlInput 
- * @param {*} onFailure 
+ *
+ * @param {*} xmlInput
+ * @param {*} onFailure
  * @returns {host[]} - Array of hosts
  */
 function convertRawJsonToScanResults(xmlInput) {
@@ -30,6 +38,8 @@ function convertRawJsonToScanResults(xmlInput) {
   };
 
   xmlInput = xmlInput.nmaprun.host;
+
+  log('# xmlInput', xmlInput)
 
   tempHostList = xmlInput.map((host) => {
     const newHost = {
@@ -68,7 +78,7 @@ function convertRawJsonToScanResults(xmlInput) {
       })
 
       newHost.openPorts = openPorts.map((portItem) => {
-        // console.log(JSON.stringify(portItem, null, 4))
+        // log(JSON.stringify(portItem, null, 4))
 
         const port = parseInt(portItem.$.portid)
         const protocol = portItem.$.protocol
@@ -90,8 +100,8 @@ function convertRawJsonToScanResults(xmlInput) {
         }
 
         let portObject = {}
-        if(port) portObject.port = port
-        if(protocol) portObject.protocol = protocol
+        if (port) portObject.port = port
+        if (protocol) portObject.protocol = protocol
 
         if (service) portObject.service = service || ''
         if (tunnel) portObject.tunnel = tunnel || ''
@@ -174,20 +184,22 @@ class NmapScan extends EventEmitter {
 
   initializeChildProcess() {
     this.startTimer();
-    this.child = spawn(nmap.nmapLocation, this.command);
+    log('# this.command:', this.command)
+    this.child = spawn(nmap.nmapLocation, this.command, {uid: 0} );
     process.on('SIGINT', this.killChild);
     process.on('uncaughtException', this.killChild);
     process.on('exit', this.killChild);
     this.child.stdout.on("data", (data) => {
       if (data.indexOf("percent") > -1) {
-        // console.log(data.toString());
+        // log(data.toString());
       } else {
         this.rawData += data;
       }
-
+      log('# data', this.rawData)
     });
 
     this.child.on('error', (err) => {
+      log('# got error', err.Error)
       this.killChild();
       if (err.code === 'ENOENT') {
         this.emit('error', 'NMAP not found at command location: ' + nmap.nmapLocation)
@@ -197,7 +209,10 @@ class NmapScan extends EventEmitter {
     })
 
     this.child.stderr.on("data", (err) => {
-      this.error = err.toString();
+      log('# got stderror', err.toString())
+      if (err.toString().substr(0,10) !== "NSOCK INFO") {
+        this.error = err.toString();
+      }
     });
 
     this.child.on("close", () => {
